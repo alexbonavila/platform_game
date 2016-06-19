@@ -5,82 +5,153 @@
     <title>Phaser</title>
     <link rel="stylesheet" type="text/css" href="src/css/main.css">
 
+
+    <style>
+        body {  background: #000;  width:100%}h1{  color: #fff;  text-align: center;}/*center canvas*/canvas { margin: auto; }
+    </style>
+
     <!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/phaser/2.4.8/phaser.min.js"></script>-->
 
 </head>
 <body>
-<h1>Phaser Platform Game</h1>
-
-
 
 <script src="node_modules/phaser/build/phaser.min.js"></script>
 
+
+
 <script>
-    var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
-    function preload() {
-        game.load.image('sky', 'assets/sky.png');
-        game.load.image('ground', 'assets/platform.png');
-        game.load.image('star', 'assets/star.png');
-        game.load.spritesheet('dude', 'assets/dude.png', 32, 48);
-    }
-    var platforms;
-    function create() {
-        //  We're going to be using physics, so enable the Arcade Physics system
-        game.physics.startSystem(Phaser.Physics.ARCADE);
-        // Background sky
-        game.add.sprite(0, 0, 'sky');
-        platforms = game.add.group();
-        platforms.enableBody = true;
-        // Ground
-        var ground = platforms.create(0, game.world.height - 64, 'ground');
-        ground.scale.setTo(2, 2);
-        ground.body.immovable = true;
-        // Platforms
-        var ledge = platforms.create(400, 400, 'ground');
-        ledge.body.immovable = true;
-        ledge = platforms.create(-150, 250, 'ground');
-        ledge.body.immovable = true;
-        ledge = platforms.create(400, 100, 'ground');
-        ledge.body.immovable = true;
-        game.add.sprite(50, 110, 'star');
-        player = game.add.sprite(32, game.world.height - 600, 'dude');
-        player.animations.add('left', [0, 1, 2, 3], 20, true);
-        player.animations.add('right', [5, 6, 7, 8], 20, true);
-        game.physics.arcade.enable(player);
-        player.body.bounce.y = 0.2;
-        player.body.gravity.y = 6000;
-        player.body.collideWorldBounds = true;
-        // Controls
-        cursors = game.input.keyboard.createCursorKeys();
-    }
-    function update() {
-        game.physics.arcade.collide(player, platforms);
-        player.body.velocity.x = 0;
-        if (cursors.left.isDown)
-        {
-            //  Move to the left
-            player.body.velocity.x = -650;
-            player.animations.play('left');
+    var playState = {
+        preload: function() {
+            game.load.image('sky', 'assets/images/sky.png');
+            game.load.image('ground', 'assets/images/platform.png');
+            game.load.image('star', 'assets/images/star.png');
+            game.load.spritesheet('dude', 'assets/images/dude.png', 32, 48);
+            game.load.audio('music', ['assets/sounds/Funky Chunk.mp3']);
+            game.load.audio('jump', ['assets/sounds/jump.wav']);
+            game.load.audio('coin', ['assets/sounds/coin.wav']);
+            game.load.tilemap('plataformes', 'assets/map/mapa1.json', null, Phaser.Tilemap.TILED_JSON);
+            game.load.image('tile_sheet', 'assets/map/tileset__r1258223531.gif');
+        },
+        create: function() {
+            game.physics.startSystem(Phaser.Physics.ARCADE);
+            this.loadMap();
+            this.loadPlayer();
+            this.loadStars();
+            this.loadSounds();
+            // score
+            this.score = 0;
+            this.scoreText = game.add.text(16, 16, 'score: 0', { fontSize: '32px', fill: '#000' });
+            // Controls
+            this.cursors = game.input.keyboard.createCursorKeys();
+            this.jumping = false;
+        },
+        update: function() {
+            game.physics.arcade.collide(this.stars, this.platformsLayer);
+            game.physics.arcade.collide(this.player, this.platformsLayer);
+            game.physics.arcade.overlap(this.player, this.stars, this.collectStar, null, this);
+            this.player.body.velocity.x = 0;
+            this.inputs();
+        },
+        inputs: function() {
+            // Directions
+            if (this.cursors.left.isDown)  { this.directionPlayer(-300, 'left'); } // Move to left
+            else if (this.cursors.right.isDown) { this.directionPlayer(300, 'right'); }  // Move to right
+            else { this.stopPlayer(); } // Stop
+            // Double jump
+            if (this.player.body.onFloor()) {
+                this.jumps = 8;
+                this.jumping = false;
+            }
+            if (this.jumps > 0 && this.upInputIsActive(5)) {
+                this.jumpPlayer(-400);
+                this.jumping = true;
+            }
+            if (this.jumping && this.upInputIsReleased()) {
+                this.jumps--;
+                this.jumping = false;
+            }
+        },
+        // Example function!
+        jumpPlayer: function(velocity) {
+            this.player.body.velocity.y = velocity;
+            this.jumpSound.play();
+        },
+        directionPlayer: function(velocity, animation) {
+            this.player.body.velocity.x = velocity;
+            this.player.animations.play(animation);
+        },
+        stopPlayer: function() {
+            this.player.animations.stop();
+            this.player.frame = 4;
+        },
+        collectStar: function(player, star) {
+            // Removes the star from the screen
+            star.kill();
+            this.coinSound.play();
+            //  Add and update the score
+            this.score += 10;
+            this.scoreText.text = 'Score: ' + this.score;
+        },
+        loadMap: function() {
+            game.stage.backgroundColor = "#4488AA";
+            this.map = game.add.tilemap('plataformes');
+            //this.map.addTilesetImage('night', 'tile_background');
+            this.map.addTilesetImage('plataformes', 'tile_sheet');
+            decorationLayer = this.map.createLayer('decoration');
+            waterLayer = this.map.createLayer('water');
+            this.platformsLayer = this.map.createLayer('ground');
+            waterLayer.resizeWorld();
+            this.map.setCollisionBetween(1, 10000, true, 'ground');
+        },
+        loadPlayer: function() {
+            this.player = game.add.sprite(20, game.world.height - 200, 'dude');
+            this.player.scale.setTo(1.1, 1.1);
+            game.physics.arcade.enable(this.player);
+            game.camera.follow(this.player);
+            this.player.body.collideWorldBounds = true;
+            this.player.animations.add('left', [0, 1, 2, 3], 20, true);
+            this.player.animations.add('right', [5, 6, 7, 8], 20, true);
+            this.player.body.bounce.y = 0.2;
+            this.player.body.gravity.y = 1200;
+        },
+        loadStars: function () {
+            this.stars = game.add.group();
+            //  We will enable physics for any star that is created in this group
+            this.stars.enableBody = true;
+            //  Here we'll create 12 of them evenly spaced apart
+            for (var i = 0; i < 30; i++)
+            {
+                //  Create a star inside of the 'stars' group
+                this.star = this.stars.create(i * 70, 0, 'star');
+                //  Let gravity do its thing
+                this.star.body.gravity.y = 300;
+                //  This just gives each star a slightly random bounce value
+                this.star.body.bounce.y = 0.7 + Math.random() * 0.2;
+            }
+        },
+        loadSounds: function () {
+            // Sounds
+            this.coinSound = game.add.audio('coin', 1);
+            this.jumpSound = game.add.audio('jump', 1);
+            // Music
+            this.music = game.add.audio('music', 0.8);
+            this.music.loop = true;
+            this.music.play();
+        },
+        upInputIsActive: function(duration) {
+            isActive = this.input.keyboard.downDuration(Phaser.Keyboard.UP, duration);
+            isActive |= (game.input.activePointer.justPressed(duration + 1000/60) &&
+            game.input.activePointer.x > game.width/4 &&
+            game.input.activePointer.x < game.width/2 + game.width/4);
+            return isActive;
+        },
+        upInputIsReleased: function() {
+            isReleased = this.input.keyboard.upDuration(Phaser.Keyboard.UP);
+            isReleased |= game.input.activePointer.justReleased();
+            return isReleased;
         }
-        else if (cursors.right.isDown)
-        {
-            //  Move to the right
-            player.body.velocity.x = 650;
-            player.animations.play('right');
-        }
-        else
-        {
-            //  Stand still
-            player.animations.stop();
-            player.frame = 4;
-        }
-        if (cursors.up.isDown && player.body.touching.down)
-        {
-            player.body.velocity.y = -6500;
-        }
-    }
+    };
+    var game = new Phaser.Game(1000, 600, Phaser.AUTO, 'game5');
+    game.state.add('play', playState);
+    game.state.start('play');
 </script>
-
-
-</body>
-</html>
