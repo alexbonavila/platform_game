@@ -3,8 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <title>Phaser</title>
+    <link rel="stylesheet" type="text/css" href="src/css/main.css">
+
+    <!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/phaser/2.4.8/phaser.min.js"></script>-->
+
 </head>
 <body>
 <h1>Phaser Platform Game</h1>
+
+
+
+<script src="node_modules/phaser/build/phaser.min.js"></script>
+
+<script>
+    var game = new Phaser.Game(1200, 700, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+    function preload() {
+    }
+    function create() {
+    }
+    function update() {
+    }
+</script>
+
+
 </body>
 </html>
